@@ -24,6 +24,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 
 with AWS.Client;
+with AWS.Messages;
 with AWS.Response;
 with AWS.URL;
 
@@ -127,6 +128,8 @@ package body Oanda_API is
    function Get_Instruments return Instrument_Array is
       use GNATCOLL.JSON;
 
+      use type AWS.Messages.Status_Code;
+
       Request  : constant String :=
         "instruments?fields=displayName%2C" &
         "pip%2CmaxTradeUnits%2C" &
@@ -137,8 +140,15 @@ package body Oanda_API is
    begin
       Response := AWS.Client.Get (URL => Base_Url & Request);
 
-      JSON :=
-         Read (AWS.Response.Message_Body (Response), "json.instruments");
+      JSON := Read (AWS.Response.Message_Body (Response), "json.instruments");
+
+      if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
+         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
+                Message   => JSON.Get("message"),
+                More_Info => JSON.Get("moreInfo"));
+
+         -- exception raised
+      end if;
 
       -- evaluate the response
       declare
@@ -194,6 +204,8 @@ package body Oanda_API is
       use Ada.Strings.Unbounded;
       use GNATCOLL.JSON;
 
+      use type AWS.Messages.Status_Code;
+
       Request  : Unbounded_String :=
         To_Unbounded_String ("quote?instruments=");
       Response : AWS.Response.Data;
@@ -210,6 +222,14 @@ package body Oanda_API is
       Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
 
       JSON := Read (AWS.Response.Message_Body (Response), "json.quote");
+
+      if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
+         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
+                Message   => JSON.Get("message"),
+                More_Info => JSON.Get("moreInfo"));
+
+         -- exception raised
+      end if;
 
       -- evaluate the response
       declare
@@ -257,6 +277,8 @@ package body Oanda_API is
       use Ada.Strings.Unbounded;
       use GNATCOLL.JSON;
 
+      use type AWS.Messages.Status_Code;
+
       function T (Source : String; Side : Trim_End := Left) return String
          renames Fixed.Trim;
 
@@ -300,6 +322,14 @@ package body Oanda_API is
       Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
 
       JSON := Read (AWS.Response.Message_Body (Response), "json.history");
+
+      if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
+         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
+                Message   => JSON.Get("message"),
+                More_Info => JSON.Get("moreInfo"));
+
+         -- exception raised
+      end if;
 
       -- evaluate the response
       declare

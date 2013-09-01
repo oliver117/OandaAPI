@@ -47,6 +47,9 @@ package Oanda_API is
 
    function To_String (Time : in RFC3339_Time) return String;
 
+   -- TODO: add functions to convert from and to Ada.Calender.Time (use
+   --Time_Of)
+
    -- general type definitions
 
    -- price / rate
@@ -110,43 +113,20 @@ package Oanda_API is
       return        Quote_Array;
 
    -- history
-   type Granularity_T is (
-     S5,
-     S10,
-     S15,
-     S30,
-     M1,
-     M2,
-     M3,
-     M5,
-     M10,
-     M15,
-     M30,
-     H1,
-     H2,
-     H3,
-     H4,
-     H6,
-     H8,
-     H12,
-     D,
+   type Granularity_T is (S5, S10, S15, S30, M1,
+     M2, M3, M5, M10, M15, M30, H1,
+     H2, H3, H4, H6, H8, H12, D,
      W,
      M);
 
-   type Candle_Format_T is (Midpoint, Bid_Ask);
+   type Candle_Format_T is (Bid_Ask, Midpoint);
 
-   type Candlestick (Format : Candle_Format_T) is record
+   type Candlestick (Format : Candle_Format_T := Bid_Ask) is record
       Time     : RFC3339_Time;
       Volume   : Natural;
       Complete : Boolean;
 
       case Format is
-         when Midpoint =>
-            Open_Mid  : Rate;
-            High_Mid  : Rate;
-            Low_Mid   : Rate;
-            Close_Mid : Rate;
-
          when Bid_Ask =>
             Open_Bid  : Rate;
             Open_Ask  : Rate;
@@ -156,9 +136,16 @@ package Oanda_API is
             Low_Ask   : Rate;
             Close_Bid : Rate;
             Close_Ask : Rate;
-      end case;
+         when Midpoint =>
+            Open_Mid  : Rate;
+            High_Mid  : Rate;
+            Low_Mid   : Rate;
+            Close_Mid : Rate;
 
+      end case;
    end record;
+
+   type Candlestick_Array is array (Integer range <>) of Candlestick;
 
    function Get_History
      (Instrument    : in Instrument_Identifier;
@@ -168,7 +155,7 @@ package Oanda_API is
       End_Time      : in RFC3339_Time    := No_Time;
       Candle_Format : in Candle_Format_T := Bid_Ask;
       Include_First : in Boolean         := True)
-      return          Candlestick;
+      return          Candlestick_Array;
 
    -- account
    type Account is private;

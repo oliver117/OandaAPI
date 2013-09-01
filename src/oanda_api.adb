@@ -25,6 +25,7 @@ with Ada.Strings.Unbounded;
 
 with AWS.Client;
 with AWS.Response;
+with AWS.URL;
 
 with GNATCOLL.JSON;
 
@@ -126,21 +127,24 @@ package body Oanda_API is
    function Get_Instruments return Instrument_Array is
       use GNATCOLL.JSON;
 
+      Request  : constant String :=
+        "instruments?fields=displayName%2C" &
+        "pip%2CmaxTradeUnits%2C" &
+        "precision%2CmaxTrailingStop%2C" &
+        "minTrailingStop%2CmarginRate";
       Response : AWS.Response.Data;
       JSON     : JSON_Value;
    begin
-      Response :=
-         AWS.Client.Get
-           (URL => Base_Url &
-                   "instruments?fields=displayName%2Cpip%2CmaxTradeUnits%2C" &
-"precision%2CmaxTrailingStop%2CminTrailingStop%2CmarginRate");
+      Response := AWS.Client.Get (URL => Base_Url & Request);
 
-      JSON := Read (AWS.Response.Message_Body (Response), "");
+      JSON :=
+         Read (AWS.Response.Message_Body (Response), "json.instruments");
 
+      -- evaluate the response
       declare
          use Bounded_Strings;
 
-         Instruments     : constant JSON_Array := Get (JSON, "instruments");
+         Instruments     : constant JSON_Array := JSON.Get ("instruments");
          Num_Instruments : constant Natural    := Length (Instruments);
          Instr           : JSON_Value;
          Instr_Array     : Instrument_Array (1 .. Num_Instruments);
@@ -149,21 +153,19 @@ package body Oanda_API is
             Instr := Get (Instruments, I);
 
             Instr_Array (I) :=
-              Instrument'
               (Identifier        => To_Bounded_String
-                                      (Get (Instr, "instrument")),
+                                      (Instr.Get ("instrument")),
                Display_Name      => To_Bounded_String
-                                      (Get (Instr, "displayName")),
-               Pip               => Rate (Float'(Get (Instr, "pip"))),
-               Max_Trade_Units   => Get (Instr, "maxTradeUnits"),
-               Precision         =>
-              Rate (Float'(Get (Instr, "precision"))),
+                                      (Instr.Get ("displayName")),
+               Pip               => Rate (Float'(Instr.Get ("pip"))),
+               Max_Trade_Units   => Instr.Get ("maxTradeUnits"),
+               Precision         => Rate (Float'(Instr.Get ("precision"))),
                Max_Trailing_Stop =>
-              Pips (Float'(Get (Instr, "maxTrailingStop"))),
+              Pips (Float'(Instr.Get ("maxTrailingStop"))),
                Min_Trailing_Stop =>
-              Pips (Float'(Get (Instr, "minTrailingStop"))),
+              Pips (Float'(Instr.Get ("minTrailingStop"))),
                Margin_Rate       =>
-              Margin_Rate_T (Float'(Get (Instr, "marginRate"))));
+              Margin_Rate_T (Float'(Instr.Get ("marginRate"))));
          end loop;
 
          return Instr_Array;
@@ -197,6 +199,7 @@ package body Oanda_API is
       Response : AWS.Response.Data;
       JSON     : JSON_Value;
    begin
+      -- compose the query string
       for I in Instruments'Range loop
          Request := Request & Bounded_Strings.To_String (Instruments (I));
          if I < Instruments'Last then
@@ -206,12 +209,13 @@ package body Oanda_API is
 
       Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
 
-      JSON := Read (AWS.Response.Message_Body (Response), "");
+      JSON := Read (AWS.Response.Message_Body (Response), "json.quote");
 
+      -- evaluate the response
       declare
          use Bounded_Strings;
 
-         Prices      : constant JSON_Array := Get (JSON, "prices");
+         Prices      : constant JSON_Array := JSON.Get ("prices");
          Num_Prices  : constant Natural    := Length (Prices);
          Price       : JSON_Value;
          Price_Array : Quote_Array (1 .. Num_Prices); -- TODO : prices or
@@ -221,11 +225,10 @@ package body Oanda_API is
             Price := Get (Prices, I);
 
             Price_Array (I) :=
-              Quote'
-              (Instrument => To_Bounded_String (Get (Price, "instrument")),
-               Time       => To_RFC3339_Time (Get (Price, "time")),
-               Bid        => Rate (Float'(Get (Price, "bid"))),
-               Ask        => Rate (Float'(Get (Price, "ask"))),
+              (Instrument => To_Bounded_String (Price.Get ("instrument")),
+               Time       => To_RFC3339_Time (Price.Get ("time")),
+               Bid        => Rate (Float'(Price.Get ("bid"))),
+               Ask        => Rate (Float'(Price.Get ("ask"))),
                Halted     => False);
             if Has_Field (Price, "halted") then
                Price_Array (I).Halted := True;
@@ -248,22 +251,96 @@ package body Oanda_API is
       End_Time      : in RFC3339_Time    := No_Time;
       Candle_Format : in Candle_Format_T := Bid_Ask;
       Include_First : in Boolean         := True)
-      return          Candlestick
+      return          Candlestick_Array
    is
+      use Ada.Strings;
+      use Ada.Strings.Unbounded;
+      use GNATCOLL.JSON;
+
+      function T (Source : String; Side : Trim_End := Left) return String
+         renames Fixed.Trim;
+
+      Request  : Unbounded_String :=
+        To_Unbounded_String ("history?instrument=");
+      Response : AWS.Response.Data;
+      JSON     : JSON_Value;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning
-        (Standard.True,
-         "Get_History unimplemented");
-      raise Program_Error;
-      return Get_History
-        (Instrument,
-         Granularity,
-                Count,
-                Start_Time,
-                End_Time,
-                Candle_Format,
-                Include_First);
+      -- compose the query string
+      Request := Request & Bounded_Strings.To_String (Instrument);
+      Request := Request &
+                 "&granularity=" &
+                 T (Granularity_T'Image (Granularity));
+      Request := Request & "&count=" & T (Positive'Image (Count));
+
+      if Start_Time /= No_Time then
+         Request := Request &
+                    "&start=" &
+                    AWS.URL.Encode (T (To_String (Start_Time)));
+      end if;
+
+      if End_Time /= No_Time then
+         Request := Request &
+                    "&end=" &
+                    AWS.URL.Encode (T (To_String (End_Time)));
+      end if;
+
+      case Candle_Format is
+         when Bid_Ask =>
+            Request := Request & "&candleFormat=bidask";
+         when Midpoint =>
+            Request := Request & "&candleFormat=midpoint";
+      end case;
+
+      if Include_First then
+         Request := Request & "&includeFirst=true";
+      else
+         Request := Request & "&includeFirst=false";
+      end if;
+
+      Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
+
+      JSON := Read (AWS.Response.Message_Body (Response), "json.history");
+
+      -- evaluate the response
+      declare
+         Candles      : constant JSON_Array := JSON.Get ("candles");
+         Num_Candles  : constant Natural    := Length (Candles);
+         Candle       : JSON_Value;
+         Candlesticks : Candlestick_Array (1 .. Num_Candles);
+      begin
+         for I in Candlesticks'Range loop
+            Candle := Get (Candles, I);
+
+            if Candle_Format = Bid_Ask then
+               Candlesticks (I) :=
+                 (Format    => Bid_Ask,
+                  Time      => To_RFC3339_Time (Candle.Get ("time")),
+                  Volume    => Candle.Get ("volume"),
+                  Complete  => Candle.Get ("complete"),
+                  Open_Bid  => Rate (Float'(Candle.Get ("openBid"))),
+                  Open_Ask  => Rate (Float'(Candle.Get ("openAsk"))),
+                  High_Bid  => Rate (Float'(Candle.Get ("highBid"))),
+                  High_Ask  => Rate (Float'(Candle.Get ("highAsk"))),
+                  Low_Bid   => Rate (Float'(Candle.Get ("lowBid"))),
+                  Low_Ask   => Rate (Float'(Candle.Get ("lowAsk"))),
+                  Close_Bid => Rate (Float'(Candle.Get ("closeBid"))),
+                  Close_Ask => Rate (Float'(Candle.Get ("closeAsk"))));
+
+            elsif Candle_Format = Midpoint then
+               Candlesticks (I) :=
+                 (Format    => Midpoint,
+                  Time      => To_RFC3339_Time (Candle.Get ("time")),
+                  Volume    => Candle.Get ("volume"),
+                  Complete  => Candle.Get ("complete"),
+                  Open_Mid  => Rate (Float'(Candle.Get ("openMid"))),
+                  High_Mid  => Rate (Float'(Candle.Get ("highMid"))),
+                  Low_Mid   => Rate (Float'(Candle.Get ("lowMid"))),
+                  Close_Mid => Rate (Float'(Candle.Get ("closeMid"))));
+            end if;
+         end loop;
+
+         return Candlesticks;
+      end;
    end Get_History;
 
    ------------------
@@ -281,10 +358,10 @@ package body Oanda_API is
 
    function Get_Open_Trades
      (Acc        : in Account;
-      Max_ID     : in Integer := Integer'Last;
-      Count      : in Positive := 500;
+      Max_ID     : in Integer               := Integer'Last;
+      Count      : in Positive              := 500;
       Instrument : in Instrument_Identifier := Null_Instrument_Identifier;
-      IDs        : in Trade_ID_Array := Null_Trade_ID_Array)
+      IDs        : in Trade_ID_Array        := Null_Trade_ID_Array)
       return       Trade_Array
    is
    begin

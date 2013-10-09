@@ -20,6 +20,7 @@
 --  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 with Ada.Calendar;
+with Ada.Exceptions;
 with Ada.Strings.Bounded;
 
 package Oanda_API is
@@ -27,13 +28,10 @@ package Oanda_API is
    -- Note: A big chunk of the API is not working / undocumented, therefore
    -- some of the functions remain unimplemented for now.
 
-   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time;
-
-   function To_RFC3339 (Time : in Ada.Calendar.Time) return String;
-
+   -- general definitions
+   -- constants
    No_Time : constant Ada.Calendar.Time;
-
-   -- general type definitions
+   Debug : constant Boolean := False;
 
    -- price / rate
    type Rate is delta 0.00_00_1 range 0.0 .. 1.0e6;
@@ -91,6 +89,7 @@ package Oanda_API is
    type Quote_Array is array (Integer range <>) of Quote;
 
    function Get_Quote (Instrument : in Instrument_Identifier) return Quote;
+
    function Get_Quotes
      (Instruments : in Instrument_Identifier_Array)
       return        Quote_Array;
@@ -234,12 +233,11 @@ package Oanda_API is
    -- error handling
    API_Error : exception;
 
-   procedure Raise_API_Error
-     (Code      : in String;
-      Message   : in String;
-      More_Info : in String);
-
 private
+   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time;
+
+   function To_RFC3339 (Time : in Ada.Calendar.Time) return String;
+
    Base_Url : constant String       := "http://api-sandbox.oanda.com/v1/";
    No_Time  : constant Ada.Calendar.Time := Ada.Calendar.Time_Of (Year    => 1901,
                                                                   Month   => 1,
@@ -251,5 +249,9 @@ private
    type Account is new Positive;
 
    Null_Trade_ID_Array : constant Trade_ID_Array := (2 .. 1 => <>);
+
+   procedure Raise_API_Error (Code      : in String;
+                              Message   : in String;
+                              More_Info : in String);
 
 end Oanda_API;

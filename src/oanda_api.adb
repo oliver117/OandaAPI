@@ -20,9 +20,9 @@
 --  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 with Ada.Calendar.Formatting;
-with Ada.Exceptions;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
+with Ada.Text_IO;
 
 with AWS.Client;
 with AWS.Messages;
@@ -32,74 +32,6 @@ with AWS.URL;
 with GNATCOLL.JSON;
 
 package body Oanda_API is
-
-   ------------------
-   -- From_RFC3339 --
-   ------------------
-
-   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time is
-      use Ada.Calendar;
-      use Ada.Calendar.Formatting;
-
-      First : constant Integer := TStr'First;
-   begin
-      -- RFC3339 format: YYYY-MM-DDTHH:MM:SS.SSSSSSZ
-      -- example: 2013-08-24T15:43:27.384729Z
-
-      return Time_Of (Year        => Year_Number'Value (TStr (First .. First + 3)),
-                      Month       => Month_Number'Value (TStr (First + 5 .. First + 6)),
-                      Day         => Day_Number'Value (TStr (First + 8 .. First + 9)),
-                      Hour        => Hour_Number'Value (TStr (First + 11 .. First + 12)),
-                      Minute      => Minute_Number'Value (TStr (First + 14 .. First + 15)),
-                      Second      => Second_Number'Value (TStr (First + 17 .. First + 18)),
-                      Sub_Second  => Second_Duration'Value ("0" & TStr (First + 19 .. TStr'Last - 1)));
-
-      -- last character is assumed to be 'Z'
-   end From_RFC3339;
-
-   ----------------
-   -- To_RFC3339 --
-   ----------------
-
-   function To_RFC3339 (Time : in Ada.Calendar.Time) return String is
-      use Ada.Calendar;
-      use Ada.Strings;
-
-      function T (Source : String; Side : Trim_End := Left) return String
-                  renames Fixed.Trim;
-
-      -- trimmed image strings
-      Year_Str : constant String := T (Year_Number'Image (Year (Time)));
-      Month_Str : constant String := T (Month_Number'Image (Month (Time)));
-      Day_Str : constant String := T (Day_Number'Image (Day (Time)));
-      Hour_Str : constant String := T (Formatting.Hour_Number'Image (Formatting.Hour (Time)));
-      Minute_Str : constant String := T (Formatting.Minute_Number'Image (Formatting.Minute (Time)));
-      Second_Str : constant String := T (Formatting.Second_Number'Image (Formatting.Second (Time)));
-      Sub_Second_Str : constant String := T (Formatting.Second_Duration'Image (Formatting.Sub_Second (Time)));
-
-      -- leading zeros
-      Month_LZ  : constant String := (if Month (Time) < 10 then "0" else "");
-      Day_LZ    : constant String := (if Day (Time) < 10 then "0" else "");
-      Hour_LZ   : constant String := (if Formatting.Hour (Time) < 10 then "0" else "");
-      Minute_LZ : constant String := (if Formatting.Minute (Time) < 10 then "0" else "");
-      Second_LZ : constant String := (if Formatting.Second (Time) < 10 then "0" else "");
-
-   begin
-      return Year_Str &
-             "-" &
-             Month_LZ & Month_Str &
-             "-" &
-             Day_LZ & Day_Str &
-             "T" &
-             Hour_LZ & Hour_Str &
-             ":" &
-             Minute_LZ & Minute_Str &
-             ":" &
-             Second_LZ & Second_Str &
-             -- cut out the leading zero
-             Sub_Second_Str (Sub_Second_Str'First + 1 .. Sub_Second_Str'Last) &
-             "Z";
-   end To_RFC3339;
 
    -------------------------
    -- To_Identifier_Array --
@@ -135,14 +67,20 @@ package body Oanda_API is
       Response : AWS.Response.Data;
       JSON     : JSON_Value;
    begin
+      if Debug then
+         Ada.Text_IO.Put_Line ("DEBUG: " & Request);
+      end if;
+
       Response := AWS.Client.Get (URL => Base_Url & Request);
 
-      JSON := Read (AWS.Response.Message_Body (Response), "json.instruments");
+      JSON :=
+         Read (AWS.Response.Message_Body (Response), "json.instruments");
 
       if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
-         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
-                Message   => JSON.Get("message"),
-                More_Info => JSON.Get("moreInfo"));
+         Raise_API_Error
+           (Code      => Integer'Image (JSON.Get ("code")),
+            Message   => JSON.Get ("message"),
+            More_Info => JSON.Get ("moreInfo"));
 
          -- exception raised
       end if;
@@ -216,14 +154,19 @@ package body Oanda_API is
          end if;
       end loop;
 
+      if Debug then
+         Ada.Text_IO.Put_Line ("DEBUG: " & To_String (Request));
+      end if;
+
       Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
 
       JSON := Read (AWS.Response.Message_Body (Response), "json.quote");
 
       if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
-         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
-                Message   => JSON.Get("message"),
-                More_Info => JSON.Get("moreInfo"));
+         Raise_API_Error
+           (Code      => Integer'Image (JSON.Get ("code")),
+            Message   => JSON.Get ("message"),
+            More_Info => JSON.Get ("moreInfo"));
 
          -- exception raised
       end if;
@@ -262,12 +205,12 @@ package body Oanda_API is
 
    function Get_History
      (Instrument    : in Instrument_Identifier;
-      Granularity   : in Granularity_T   := S5;
-      Count         : in Positive        := 500;
-      Start_Time    : in Ada.Calendar.Time    := No_Time;
-      End_Time      : in Ada.Calendar.Time    := No_Time;
-      Candle_Format : in Candle_Format_T := Bid_Ask;
-      Include_First : in Boolean         := True)
+      Granularity   : in Granularity_T     := S5;
+      Count         : in Positive          := 500;
+      Start_Time    : in Ada.Calendar.Time := No_Time;
+      End_Time      : in Ada.Calendar.Time := No_Time;
+      Candle_Format : in Candle_Format_T   := Bid_Ask;
+      Include_First : in Boolean           := True)
       return          Candlestick_Array
    is
       use Ada.Strings;
@@ -289,8 +232,7 @@ package body Oanda_API is
       Request := Request & Bounded_Strings.To_String (Instrument);
       Request := Request &
                  "&granularity=" &
-                 T (Granularity_T'Image (Granularity));
-      Request := Request & "&count=" & T (Positive'Image (Count));
+        T (Granularity_T'Image (Granularity));
 
       if Start_Time /= No_Time then
          Request := Request &
@@ -304,19 +246,28 @@ package body Oanda_API is
                     AWS.URL.Encode (T (To_RFC3339 (End_Time)));
       end if;
 
+      if not (Start_Time /= No_Time and End_Time /= No_Time) then
+          Request := Request & "&count=" & T (Positive'Image (Count));
+      end if;
+
+      -- can only be specified if Start_Time is specified
+      if Start_Time /= No_Time then
+         if Include_First then
+            Request := Request & "&includeFirst=true";
+         else
+            Request := Request & "&includeFirst=false";
+         end if;
+      end if;
+
       case Candle_Format is
          when Bid_Ask =>
-            -- default value
-            null;
+            Request := Request & "&candleFormat=bidask";
          when Midpoint =>
             Request := Request & "&candleFormat=midpoint";
       end case;
 
-      if Include_First then
-         -- default value
-         null;
-      else
-         Request := Request & "&includeFirst=false";
+      if Debug then
+         Ada.Text_IO.Put_Line ("DEBUG: " & To_String (Request));
       end if;
 
       Response := AWS.Client.Get (URL => Base_Url & To_String (Request));
@@ -324,9 +275,10 @@ package body Oanda_API is
       JSON := Read (AWS.Response.Message_Body (Response), "json.history");
 
       if AWS.Response.Status_Code (Response) /= AWS.Messages.S200 then
-         Raise_API_Error (Code      => Integer'Image (JSON.Get("code")),
-                Message   => JSON.Get("message"),
-                More_Info => JSON.Get("moreInfo"));
+         Raise_API_Error
+           (Code      => Integer'Image (JSON.Get ("code")),
+            Message   => JSON.Get ("message"),
+            More_Info => JSON.Get ("moreInfo"));
 
          -- exception raised
       end if;
@@ -474,6 +426,98 @@ package body Oanda_API is
       raise Program_Error;
       return Close_Trade (Acc, T_ID);
    end Close_Trade;
+
+   -- private
+
+   ------------------
+   -- From_RFC3339 --
+   ------------------
+
+   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time is
+      use Ada.Calendar;
+      use Ada.Calendar.Formatting;
+
+      First : constant Integer := TStr'First;
+   begin
+      -- RFC3339 format: YYYY-MM-DDTHH:MM:SS.SSSSSSZ
+      -- example: 2013-08-24T15:43:27.384729Z
+
+      return Time_Of
+               (Year       => Year_Number'Value (TStr (First .. First + 3)),
+                Month      =>
+                   Month_Number'Value (TStr (First + 5 .. First + 6)),
+                Day        =>
+                   Day_Number'Value (TStr (First + 8 .. First + 9)),
+                Hour       =>
+                   Hour_Number'Value (TStr (First + 11 .. First + 12)),
+                Minute     =>
+                   Minute_Number'Value (TStr (First + 14 .. First + 15)),
+                Second     =>
+                   Second_Number'Value (TStr (First + 17 .. First + 18)),
+                Sub_Second =>
+                   Second_Duration'Value
+                     ("0" & TStr (First + 19 .. TStr'Last - 1)));
+
+      -- last character is assumed to be 'Z'
+   end From_RFC3339;
+
+   ----------------
+   -- To_RFC3339 --
+   ----------------
+
+   function To_RFC3339 (Time : in Ada.Calendar.Time) return String is
+      use Ada.Calendar;
+      use Ada.Strings;
+
+      function T (Source : String; Side : Trim_End := Left) return String
+         renames Fixed.Trim;
+
+      -- trimmed image strings
+      Year_Str       : constant String :=
+        T (Year_Number'Image (Year (Time)));
+      Month_Str      : constant String :=
+        T (Month_Number'Image (Month (Time)));
+      Day_Str        : constant String := T (Day_Number'Image (Day (Time)));
+      Hour_Str       : constant String :=
+        T (Formatting.Hour_Number'Image (Formatting.Hour (Time)));
+      Minute_Str     : constant String :=
+        T (Formatting.Minute_Number'Image (Formatting.Minute (Time)));
+      Second_Str     : constant String :=
+        T (Formatting.Second_Number'Image (Formatting.Second (Time)));
+      Sub_Second_Str : constant String :=
+        T (Formatting.Second_Duration'Image (Formatting.Sub_Second (Time)));
+
+      -- leading zeros
+      Month_LZ  : constant String := (if Month (Time) < 10 then "0" else "");
+      Day_LZ    : constant String := (if Day (Time) < 10 then "0" else "");
+      Hour_LZ   : constant String :=
+        (if Formatting.Hour (Time) < 10 then "0" else "");
+      Minute_LZ : constant String :=
+        (if Formatting.Minute (Time) < 10 then "0" else "");
+      Second_LZ : constant String :=
+        (if Formatting.Second (Time) < 10 then "0" else "");
+
+   begin
+      return Year_Str &
+             "-" &
+             Month_LZ &
+             Month_Str &
+             "-" &
+             Day_LZ &
+             Day_Str &
+             "T" &
+             Hour_LZ &
+             Hour_Str &
+             ":" &
+             Minute_LZ &
+             Minute_Str &
+             ":" &
+             Second_LZ &
+             Second_Str &
+      -- cut out the leading zero
+             Sub_Second_Str (Sub_Second_Str'First + 1 .. Sub_Second_Str'Last) &
+             "Z";
+   end To_RFC3339;
 
    ---------------------
    -- Raise_API_Error --

@@ -27,28 +27,11 @@ package Oanda_API is
    -- Note: A big chunk of the API is not working / undocumented, therefore
    -- some of the functions remain unimplemented for now.
 
-   -- time
-   type Hour_Number is range 0 .. 23;
-   type Minute_Number is range 0 .. 59;
-   type Second_Number is delta 0.00_00_01 range 0.0 .. 60.0;
+   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time;
 
-   type RFC3339_Time is record
-      Year   : Ada.Calendar.Year_Number;
-      Month  : Ada.Calendar.Month_Number;
-      Day    : Ada.Calendar.Day_Number;
-      Hour   : Hour_Number;
-      Minute : Minute_Number;
-      Second : Second_Number;
-   end record;
+   function To_RFC3339 (Time : in Ada.Calendar.Time) return String;
 
-   No_Time : constant RFC3339_Time;
-
-   function To_RFC3339_Time (TStr : in String) return RFC3339_Time;
-
-   function To_String (Time : in RFC3339_Time) return String;
-
-   -- TODO: add functions to convert from and to Ada.Calender.Time (use
-   --Time_Of)
+   No_Time : constant Ada.Calendar.Time;
 
    -- general type definitions
 
@@ -99,7 +82,7 @@ package Oanda_API is
    -- quote
    type Quote is record
       Instrument : Instrument_Identifier;
-      Time       : RFC3339_Time;
+      Time       : Ada.Calendar.Time;
       Bid        : Rate;
       Ask        : Rate;
       Halted     : Boolean;
@@ -122,7 +105,7 @@ package Oanda_API is
    type Candle_Format_T is (Bid_Ask, Midpoint);
 
    type Candlestick (Format : Candle_Format_T := Bid_Ask) is record
-      Time     : RFC3339_Time;
+      Time     : Ada.Calendar.Time;
       Volume   : Natural;
       Complete : Boolean;
 
@@ -151,8 +134,8 @@ package Oanda_API is
      (Instrument    : in Instrument_Identifier;
       Granularity   : in Granularity_T   := S5;
       Count         : in Positive        := 500;
-      Start_Time    : in RFC3339_Time    := No_Time;
-      End_Time      : in RFC3339_Time    := No_Time;
+      Start_Time    : in Ada.Calendar.Time    := No_Time;
+      End_Time      : in Ada.Calendar.Time    := No_Time;
       Candle_Format : in Candle_Format_T := Bid_Ask;
       Include_First : in Boolean         := True)
       return          Candlestick_Array;
@@ -178,7 +161,7 @@ package Oanda_API is
       Units         : Positive;
       Side          : Side_T;
       Instrument    : Instrument_Identifier;
-      Time          : RFC3339_Time;
+      Time          : Ada.Calendar.Time;
       Price         : Rate;
       Stop_Loss     : Pips;
       Take_Profit   : Pips;
@@ -207,7 +190,7 @@ package Oanda_API is
          Price      : Rate;
          MarginUsed : Margin_Rate_T;
          Side       : Side_T;
-         Time       : RFC3339_Time;
+         Time       : Ada.Calendar.Time;
       end record;
 
    -- unimplemented
@@ -239,7 +222,7 @@ package Oanda_API is
       Instrument : Instrument_Identifier;
       Profit     : Balance;
       Side       : Side_T;
-      Time       : RFC3339_Time;
+      Time       : Ada.Calendar.Time;
    end record;
 
    -- unimplemented
@@ -258,14 +241,10 @@ package Oanda_API is
 
 private
    Base_Url : constant String       := "http://api-sandbox.oanda.com/v1/";
-   No_Time  : constant RFC3339_Time :=
-     RFC3339_Time'
-     (Year   => 1901,
-      Month  => 1,
-      Day    => 1,
-      Hour   => 0,
-      Minute => 0,
-      Second => 0.0);
+   No_Time  : constant Ada.Calendar.Time := Ada.Calendar.Time_Of (Year    => 1901,
+                                                                  Month   => 1,
+                                                                  Day     => 1,
+                                                                  Seconds => 0.0);
 
    Null_Instrument_Identifier : constant Instrument_Identifier := Bounded_Strings.Null_Bounded_String;
 

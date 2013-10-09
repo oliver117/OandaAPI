@@ -19,6 +19,7 @@
 --  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 --  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+with Ada.Calendar.Formatting;
 with Ada.Exceptions;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
@@ -32,77 +33,73 @@ with GNATCOLL.JSON;
 
 package body Oanda_API is
 
-   ---------------------
-   -- To_RFC3339_Time --
-   ---------------------
+   ------------------
+   -- From_RFC3339 --
+   ------------------
 
-   function To_RFC3339_Time (TStr : in String) return RFC3339_Time is
-      Time  : RFC3339_Time;
+   function From_RFC3339 (TStr : in String) return Ada.Calendar.Time is
+      use Ada.Calendar;
+      use Ada.Calendar.Formatting;
+
       First : constant Integer := TStr'First;
    begin
       -- RFC3339 format: YYYY-MM-DDTHH:MM:SS.SSSSSSZ
       -- example: 2013-08-24T15:43:27.384729Z
 
-      Time.Year   :=
-         Ada.Calendar.Year_Number'Value (TStr (First .. First + 3));
-      Time.Month  :=
-         Ada.Calendar.Month_Number'Value (TStr (First + 5 .. First + 6));
-      Time.Day    :=
-         Ada.Calendar.Day_Number'Value (TStr (First + 8 .. First + 9));
-      Time.Hour   := Hour_Number'Value (TStr (First + 11 .. First + 12));
-      Time.Minute := Minute_Number'Value (TStr (First + 14 .. First + 15));
-      Time.Second :=
-         Second_Number'Value (TStr (First + 17 .. TStr'Last - 1));
+      return Time_Of (Year        => Year_Number'Value (TStr (First .. First + 3)),
+                      Month       => Month_Number'Value (TStr (First + 5 .. First + 6)),
+                      Day         => Day_Number'Value (TStr (First + 8 .. First + 9)),
+                      Hour        => Hour_Number'Value (TStr (First + 11 .. First + 12)),
+                      Minute      => Minute_Number'Value (TStr (First + 14 .. First + 15)),
+                      Second      => Second_Number'Value (TStr (First + 17 .. First + 18)),
+                      Sub_Second  => Second_Duration'Value ("0" & TStr (First + 19 .. TStr'Last - 1)));
 
-      return Time;
-   end To_RFC3339_Time;
+      -- last character is assumed to be 'Z'
+   end From_RFC3339;
 
-   ---------------
-   -- To_String --
-   ---------------
+   ----------------
+   -- To_RFC3339 --
+   ----------------
 
-   function To_String (Time : in RFC3339_Time) return String is
+   function To_RFC3339 (Time : in Ada.Calendar.Time) return String is
+      use Ada.Calendar;
       use Ada.Strings;
+
       function T (Source : String; Side : Trim_End := Left) return String
-         renames Fixed.Trim;
+                  renames Fixed.Trim;
 
       -- trimmed image strings
-      Year   : constant String :=
-        T (Ada.Calendar.Year_Number'Image (Time.Year));
-      Month  : constant String :=
-        T (Ada.Calendar.Month_Number'Image (Time.Month));
-      Day    : constant String :=
-        T (Ada.Calendar.Day_Number'Image (Time.Day));
-      Hour   : constant String := T (Hour_Number'Image (Time.Hour));
-      Minute : constant String := T (Minute_Number'Image (Time.Minute));
-      Second : constant String := T (Second_Number'Image (Time.Second));
+      Year_Str : constant String := T (Year_Number'Image (Year (Time)));
+      Month_Str : constant String := T (Month_Number'Image (Month (Time)));
+      Day_Str : constant String := T (Day_Number'Image (Day (Time)));
+      Hour_Str : constant String := T (Formatting.Hour_Number'Image (Formatting.Hour (Time)));
+      Minute_Str : constant String := T (Formatting.Minute_Number'Image (Formatting.Minute (Time)));
+      Second_Str : constant String := T (Formatting.Second_Number'Image (Formatting.Second (Time)));
+      Sub_Second_Str : constant String := T (Formatting.Second_Duration'Image (Formatting.Sub_Second (Time)));
 
       -- leading zeros
-      Month_LZ  : constant String := (if Time.Month < 10 then "0" else "");
-      Day_LZ    : constant String := (if Time.Day < 10 then "0" else "");
-      Hour_LZ   : constant String := (if Time.Hour < 10 then "0" else "");
-      Second_LZ : constant String := (if Time.Second < 10.0 then "0" else "");
-      Minute_LZ : constant String := (if Time.Minute < 10 then "0" else "");
+      Month_LZ  : constant String := (if Month (Time) < 10 then "0" else "");
+      Day_LZ    : constant String := (if Day (Time) < 10 then "0" else "");
+      Hour_LZ   : constant String := (if Formatting.Hour (Time) < 10 then "0" else "");
+      Minute_LZ : constant String := (if Formatting.Minute (Time) < 10 then "0" else "");
+      Second_LZ : constant String := (if Formatting.Second (Time) < 10 then "0" else "");
 
    begin
-      return Year &
+      return Year_Str &
              "-" &
-             Month_LZ &
-             Month &
+             Month_LZ & Month_Str &
              "-" &
-             Day_LZ &
-             Day &
+             Day_LZ & Day_Str &
              "T" &
-             Hour_LZ &
-             Hour &
+             Hour_LZ & Hour_Str &
              ":" &
-             Minute_LZ &
-             Minute &
+             Minute_LZ & Minute_Str &
              ":" &
-             Second_LZ &
-             Second &
+             Second_LZ & Second_Str &
+             -- cut out the leading zero
+             Sub_Second_Str (Sub_Second_Str'First + 1 .. Sub_Second_Str'Last) &
              "Z";
-   end To_String;
+   end To_RFC3339;
 
    -------------------------
    -- To_Identifier_Array --
@@ -246,7 +243,7 @@ package body Oanda_API is
 
             Price_Array (I) :=
               (Instrument => To_Bounded_String (Price.Get ("instrument")),
-               Time       => To_RFC3339_Time (Price.Get ("time")),
+               Time       => From_RFC3339 (Price.Get ("time")),
                Bid        => Rate (Float'(Price.Get ("bid"))),
                Ask        => Rate (Float'(Price.Get ("ask"))),
                Halted     => False);
@@ -267,8 +264,8 @@ package body Oanda_API is
      (Instrument    : in Instrument_Identifier;
       Granularity   : in Granularity_T   := S5;
       Count         : in Positive        := 500;
-      Start_Time    : in RFC3339_Time    := No_Time;
-      End_Time      : in RFC3339_Time    := No_Time;
+      Start_Time    : in Ada.Calendar.Time    := No_Time;
+      End_Time      : in Ada.Calendar.Time    := No_Time;
       Candle_Format : in Candle_Format_T := Bid_Ask;
       Include_First : in Boolean         := True)
       return          Candlestick_Array
@@ -277,6 +274,7 @@ package body Oanda_API is
       use Ada.Strings.Unbounded;
       use GNATCOLL.JSON;
 
+      use type Ada.Calendar.Time;
       use type AWS.Messages.Status_Code;
 
       function T (Source : String; Side : Trim_End := Left) return String
@@ -297,24 +295,26 @@ package body Oanda_API is
       if Start_Time /= No_Time then
          Request := Request &
                     "&start=" &
-                    AWS.URL.Encode (T (To_String (Start_Time)));
+                    AWS.URL.Encode (T (To_RFC3339 (Start_Time)));
       end if;
 
       if End_Time /= No_Time then
          Request := Request &
                     "&end=" &
-                    AWS.URL.Encode (T (To_String (End_Time)));
+                    AWS.URL.Encode (T (To_RFC3339 (End_Time)));
       end if;
 
       case Candle_Format is
          when Bid_Ask =>
-            Request := Request & "&candleFormat=bidask";
+            -- default value
+            null;
          when Midpoint =>
             Request := Request & "&candleFormat=midpoint";
       end case;
 
       if Include_First then
-         Request := Request & "&includeFirst=true";
+         -- default value
+         null;
       else
          Request := Request & "&includeFirst=false";
       end if;
@@ -344,7 +344,7 @@ package body Oanda_API is
             if Candle_Format = Bid_Ask then
                Candlesticks (I) :=
                  (Format    => Bid_Ask,
-                  Time      => To_RFC3339_Time (Candle.Get ("time")),
+                  Time      => From_RFC3339 (Candle.Get ("time")),
                   Volume    => Candle.Get ("volume"),
                   Complete  => Candle.Get ("complete"),
                   Open_Bid  => Rate (Float'(Candle.Get ("openBid"))),
@@ -359,7 +359,7 @@ package body Oanda_API is
             elsif Candle_Format = Midpoint then
                Candlesticks (I) :=
                  (Format    => Midpoint,
-                  Time      => To_RFC3339_Time (Candle.Get ("time")),
+                  Time      => From_RFC3339 (Candle.Get ("time")),
                   Volume    => Candle.Get ("volume"),
                   Complete  => Candle.Get ("complete"),
                   Open_Mid  => Rate (Float'(Candle.Get ("openMid"))),

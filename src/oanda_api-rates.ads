@@ -23,11 +23,15 @@ with Ada.Containers.Hashed_Maps;
 
 package Oanda_API.Rates is
 
+   function To_Instrument_Array (Instr_Info : in Instrument_Information_Array) return Instrument_Array;
+
    function Get_Instruments (Acc : in Account) return Instrument_Array;
+
+   function Get_Instrument_Information (Acc : in Account) return Instrument_Information_Array;
 
    -- quote
    type Quote is record
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Time       : Ada.Calendar.Time;
       Bid        : Rate;
       Ask        : Rate;
@@ -36,12 +40,12 @@ package Oanda_API.Rates is
 
    type Quote_Array is array (Integer range <>) of Quote;
 
-   package Quote_Maps is new Ada.Containers.Hashed_Maps (Key_Type        => Instrument_Identifier,
+   package Quote_Maps is new Ada.Containers.Hashed_Maps (Key_Type        => Instrument_T,
                                                          Element_Type    => Quote,
                                                          Hash            => Instrument_Hash ,
                                                          Equivalent_Keys => "=");
 
-   function Get_Quote (Instr : in Instrument) return Quote;
+   function Get_Quote (Instrument : in Instrument_T) return Quote;
 
    function Get_Quotes
      (Instruments : in Instrument_Array)
@@ -83,7 +87,7 @@ package Oanda_API.Rates is
    type Candlestick_Array is array (Integer range <>) of Candlestick;
 
    function Get_History
-     (Instrument    : in Instrument_Identifier;
+     (Instrument    : in Instrument_T;
       Granularity   : in Granularity_T   := S5;
       Count         : in Positive        := 500;
       Start_Time    : in Ada.Calendar.Time    := No_Time;

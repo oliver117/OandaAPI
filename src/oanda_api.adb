@@ -35,19 +35,19 @@ package body Oanda_API is
    -- Instrument_Hash --
    ---------------------
 
-   function Instrument_Hash (Instr_Ident : in Instrument_Identifier) return Ada.Containers.Hash_Type is (Hash (Instr_Ident));
+   function Instrument_Hash (Instrument : in Instrument_T) return Ada.Containers.Hash_Type is (Hash (Instrument));
 
    -------------------
-   -- To_Identifier --
+   -- To_Instrument --
    -------------------
 
-   function To_Identifier (Str : in String) return Instrument_Identifier is (Instrument_Identifier'(To_Unbounded_String (Str)));
+   function To_Instrument (Str : in String) return Instrument_T is (Instrument_T'(To_Unbounded_String (Str)));
 
    ---------------
    -- To_String --
    ---------------
 
-   function To_String (Identifier : in Instrument_Identifier) return String is (To_String (Source => Unbounded_String (Identifier)));
+   function To_String (Instrument : in Instrument_T) return String is (To_String (Source => Unbounded_String (Instrument)));
 
    ------------------
    -- Display_Name --

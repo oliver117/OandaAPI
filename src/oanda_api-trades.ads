@@ -21,17 +21,8 @@
 
 package Oanda_API.Trades is
 
-   -- trade
-   type Side_T is (Buy, Sell);
-
-   type Trade_ID is new Natural;
-
-   type Trade_ID_Array is array (Integer range <>) of Trade_ID;
-
-   Null_Trade_ID_Array : constant Trade_ID_Array;
-
    type Trade is record
-      ID            : Trade_ID;
+      ID            : ID_T;
       Units         : Positive;
       Side          : Side_T;
       Instrument    : Instrument_Identifier;
@@ -49,7 +40,7 @@ package Oanda_API.Trades is
       Max_ID     : in Integer := Integer'Last;
       Count      : in Positive := 500;
       Instrument : in Instrument_Identifier := Null_Instrument_Identifier;
-      IDs        : in Trade_ID_Array := Null_Trade_ID_Array)
+      IDs        : in ID_Array := Null_ID_Array)
       return       Trade_Array;
 
    type Affected_Trade is

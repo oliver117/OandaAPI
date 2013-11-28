@@ -33,7 +33,25 @@ package body Oanda_API.Rates is
    -- Instruments --
    -----------------
 
+   function To_Instrument_Array (Instr_Info : in Instrument_Information_Array) return Instrument_Array is
+      Instruments : Instrument_Array (Instr_Info'Range);
+   begin
+      for I in Instr_Info'Range loop
+         Instruments (I) := Instr_Info (I).Instrument;
+      end loop;
+
+      return Instruments;
+   end To_Instrument_Array;
+
+
    function Get_Instruments (Acc : in Account) return Instrument_Array is
+      Instr_Info : constant Instrument_Information_Array := Get_Instrument_Information (Acc);
+   begin
+      return To_Instrument_Array (Instr_Info);
+   end Get_Instruments;
+
+
+   function Get_Instrument_Information (Acc : in Account) return Instrument_Information_Array is
       use Ada.Strings;
       use GNATCOLL.JSON;
 
@@ -72,13 +90,13 @@ package body Oanda_API.Rates is
          Instruments     : constant JSON_Array := JSON.Get ("instruments");
          Num_Instruments : constant Natural    := Length (Instruments);
          Instr           : JSON_Value;
-         Instr_Array     : Instrument_Array (1 .. Num_Instruments);
+         Instr_Array     : Instrument_Information_Array (1 .. Num_Instruments);
       begin
          for I in Instr_Array'Range loop
             Instr := Get (Instruments, I);
 
             Instr_Array (I) :=
-              (Identifier        => To_Identifier (Instr.Get ("instrument")),
+              (Instrument        => To_Instrument (Instr.Get ("instrument")),
                Display_Name      => Unbounded.To_Unbounded_String (Source => Instr.Get ("displayName")),
                Pip               => Rate (Float'(Instr.Get ("pip"))),
                Max_Trade_Units   => Instr.Get ("maxTradeUnits"),
@@ -90,15 +108,15 @@ package body Oanda_API.Rates is
 
          return Instr_Array;
       end;
-   end Get_Instruments;
+   end Get_Instrument_Information;
 
    ---------------
    -- Get_Quote --
    ---------------
 
-   function Get_Quote (Instr : in Instrument) return Quote is
+   function Get_Quote (Instrument : in Instrument_T) return Quote is
       Quotes : constant Quote_Array :=
-        Get_Quotes (Instrument_Array'(1 => Instr));
+        Get_Quotes (Instrument_Array'(1 => Instrument));
    begin
       return Quotes (Quotes'First);
    end Get_Quote;
@@ -123,7 +141,7 @@ package body Oanda_API.Rates is
    begin
       -- compose the query string
       for I in Instruments'Range loop
-         Request := Request & To_String (Instruments (I).Identifier);
+         Request := Request & To_String (Instruments (I));
          if I < Instruments'Last then
             Request := Request & "%2C";
          end if;
@@ -159,7 +177,7 @@ package body Oanda_API.Rates is
             Price := Get (Prices, I);
 
             Price_Array (I) :=
-              (Instrument => To_Identifier (Price.Get ("instrument")),
+              (Instrument => To_Instrument (Price.Get ("instrument")),
                Time       => From_RFC3339 (Price.Get ("time")),
                Bid        => Rate (Float'(Price.Get ("bid"))),
                Ask        => Rate (Float'(Price.Get ("ask"))),
@@ -178,7 +196,7 @@ package body Oanda_API.Rates is
    -----------------
 
    function Get_History
-     (Instrument    : in Instrument_Identifier;
+     (Instrument    : in Instrument_T;
       Granularity   : in Granularity_T     := S5;
       Count         : in Positive          := 500;
       Start_Time    : in Ada.Calendar.Time := No_Time;

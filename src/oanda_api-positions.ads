@@ -4,7 +4,7 @@ package Oanda_API.Positions is
 
    type Position is record
       Side : Side_T;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Units : Natural;
       Average_Price : Rate;
    end record;
@@ -16,12 +16,12 @@ package Oanda_API.Positions is
    function Open_Positions return Position_Array;
 
    type Close_Position_Response is record
-      IDs : Transaction_ID_Array;
-      Instrument : Instrument_Identifier;
+      IDs : ID_Array(0 .. 1);
+      Instrument : Instrument_T;
       Total_Units : Natural;
       Price : Rate;
    end record;
 
-   function Close_Position (Instrument : Instrument_Identifier) return Close_Position_Response;
+   function Close_Position (Instrument : Instrument_T) return Close_Position_Response;
 
 end Oanda_API.Positions;

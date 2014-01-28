@@ -27,6 +27,8 @@ package Oanda_API.Rates is
 
    function Get_Instruments (Acc : in Account) return Instrument_Array;
 
+   function Get_Instrument_Information (Acc : in Account; Instrument : Instrument_T) return Instrument_Information;
+
    function Get_Instrument_Information (Acc : in Account) return Instrument_Information_Array;
 
    -- quote

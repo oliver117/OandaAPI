@@ -25,7 +25,7 @@ package Oanda_API.Trades is
       ID            : ID_T;
       Units         : Positive;
       Side          : Side_T;
-      Instrument    : Instrument_Identifier;
+      Instrument    : Instrument_T;
       Time          : Ada.Calendar.Time;
       Price         : Rate;
       Stop_Loss     : Pips;
@@ -39,13 +39,13 @@ package Oanda_API.Trades is
      (Acc        : in Account;
       Max_ID     : in Integer := Integer'Last;
       Count      : in Positive := 500;
-      Instrument : in Instrument_Identifier := Null_Instrument_Identifier;
+      Instrument : in Instrument_T := Null_Instrument;
       IDs        : in ID_Array := Null_ID_Array)
       return       Trade_Array;
 
    type Affected_Trade is
       record
-         ID : Trade_ID;
+         ID : ID_T;
          Units : Positive; -- Units remaining in updated trade / Units in closed trade
          Side : Side_T;
       end record;
@@ -54,10 +54,10 @@ package Oanda_API.Trades is
 
    type Create_Trade_Response (Num_Closed : Integer; Num_Changed : Integer) is
       record
-         Instrument : Instrument_Identifier;
+         Instrument : Instrument_T;
          Time       : Ada.Calendar.Time;
          Price      : Rate;
-         Opened     : Trade_ID;
+         Opened     : ID_T;
          Units      : Positive;
          Side       : Side_T;
          Take_Profit   : Pips;
@@ -69,7 +69,7 @@ package Oanda_API.Trades is
 
    procedure Create_Trade
      (Acc           : in Account;
-      Instrument    : in Instrument_Identifier;
+      Instrument    : in Instrument_T;
       Units         : in Positive;
       Side          : in Side_T;
       Lower_Bound   : in Rate;
@@ -78,20 +78,20 @@ package Oanda_API.Trades is
       Take_Profit   : in Rate;
       Trailing_Stop : in Pipettes);
 
-   function Get_Trade (Acc : in Account; T_ID : in Trade_ID) return Trade;
+   function Get_Trade (Acc : in Account; Trade_ID : in ID_T) return Trade;
 
    function Modify_Trade
      (Acc           : in Account;
-      T_ID          : in Trade_ID;
+      Trade_ID          : in ID_T;
       Stop_Loss     : in Rate;
       Take_Profit   : in Rate;
       Trailing_Stop : in Pipettes)
       return          Trade;
 
    type Close_Trade_Response is record
-      ID         : Trade_ID;
+      Trade_ID         : ID_T;
       Price      : Rate;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Profit     : Money;
       Side       : Side_T;
       Time       : Ada.Calendar.Time;
@@ -99,11 +99,9 @@ package Oanda_API.Trades is
 
    function Close_Trade
      (Acc  : in Account;
-      T_ID : in Trade_ID)
+      Trade_ID : in ID_T)
       return Close_Trade_Response;
 
 private
-
-   Null_Trade_ID_Array : constant Trade_ID_Array := (2 .. 1 => <>);
 
 end Oanda_API.Trades;

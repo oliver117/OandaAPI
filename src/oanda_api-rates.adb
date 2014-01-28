@@ -51,6 +51,19 @@ package body Oanda_API.Rates is
    end Get_Instruments;
 
 
+   function Get_Instrument_Information (Acc : in Account; Instrument : Instrument_T) return Instrument_Information is
+      Information : Instrument_Information_Array := Get_Instrument_Information (Acc);
+   begin
+      for I in Information'Range loop
+         if Information (I).Instrument = Instrument then
+            return Information (I);
+         end if;
+      end loop;
+
+      raise No_Such_Instrument;
+   end Get_Instrument_Information;
+
+
    function Get_Instrument_Information (Acc : in Account) return Instrument_Information_Array is
       use Ada.Strings;
       use GNATCOLL.JSON;

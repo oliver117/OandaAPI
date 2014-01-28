@@ -91,6 +91,7 @@ package Oanda_API is
 
    -- error handling
    API_Error : exception;
+   No_Such_Instrument : exception;
 
 private
    Null_ID_Array : constant ID_Array (1 .. 0) := (others => <>);

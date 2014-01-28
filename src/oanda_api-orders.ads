@@ -26,12 +26,12 @@ package Oanda_API.Orders is
    function Get_Orders (Acc : in Account;
                         Max_ID : in Natural;
                         Count : in Positive := 50;
-                        Instrument : in Instrument_Identifier;
+                        Instrument : in Instrument_T;
                         IDs : in ID_Array) return Order_Array;
 
    type Create_Order_Response is record
       ID : ID_T;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Units : Natural;
       Side : Side_T;
       Time : Ada.Calendar.Time;
@@ -45,7 +45,7 @@ package Oanda_API.Orders is
    end record;
 
    function Create_Order (Acc : Account;
-                          Instrument : Instrument_Identifier;
+                          Instrument : Instrument_T;
                           Units : Natural;
                           Expiry : Ada.Calendar.Time;
                           Price : Rate;
@@ -61,7 +61,7 @@ package Oanda_API.Orders is
       ID : ID_T;
       Typ : Order_Type;
       Side : Side_T;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Units : Natural;
       Time : Ada.Calendar.Time;
       Price : Rate;
@@ -89,7 +89,7 @@ package Oanda_API.Orders is
 
    type Close_Order_Response is record
       ID : ID_T;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Units : Natural;
       Side : Side_T;
       Price : Rate;

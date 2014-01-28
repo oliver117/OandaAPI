@@ -1,4 +1,4 @@
-
+with Oanda_API.Orders;
 
 package Oanda_API.Transactions is
 
@@ -21,18 +21,18 @@ package Oanda_API.Transactions is
    type Transaction is record
       ID : ID_T;
       Acc : Account;
-      Typ : Order_Type;
+      Typ : Oanda_API.Orders.Order_Type;
       Units : Natural;
       Side : Side_T;
       Action : Transaction_Action;
       Reason : Transaction_Reason;
-      Instrument : Instrument_Identifier;
+      Instrument : Instrument_T;
       Time : Ada.Calendar.Time;
       Price : Rate;
       Balance : Money;
       Profit_Loss : Money;
       Margin_Used : Margin_Rate_T;
-   end Transaction;
+   end record;
 
    type Transaction_Array is array (Integer range <>) of Transaction;
 
